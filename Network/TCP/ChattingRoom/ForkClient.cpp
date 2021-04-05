@@ -13,6 +13,7 @@
 #define PORT 32768
 
 bool isLogin = false;
+char loggedinUsername[32];
 
 struct sendMessageToServer
 {
@@ -68,6 +69,7 @@ void * receiveMessage(void* arg)
         if(receivedLength == 0)
         {
             printf("Server has been shutdown!\n");
+            pthread_exit(NULL);
         }
 
         if(receivedMessage->result == 0)
@@ -77,14 +79,9 @@ void * receiveMessage(void* arg)
             case 0:
                 printf("Regist success! Please login.\n");
                 break;
-                
-            
             case 1:
                 printf("Login success!\n");
                 isLogin = true;
-
-
-                
                 break;
             case 2:
                 printf("%s send you a message:%s", receivedMessage->receiveFromName, receivedMessage->message);
@@ -105,6 +102,13 @@ void * receiveMessage(void* arg)
             case 1:
                 printf("Login falied\n");
                 isLogin = false;
+                memset(loggedinUsername,0,sizeof(loggedinUsername));
+                break;
+            case 2:
+                printf("Send message failed!\n");
+                break;
+            case 3:
+                printf("Send broadcast message failed!\n");
                 break;
             }
         }
@@ -148,13 +152,10 @@ int main(int argc, char* argv[])
      * 3. receive message from broadcast
      * etc;
     */
-    struct sendMessageToServer *sendMessage;
-    sendMessage = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
 
     while(! isLogin)
     {
         int choice;
-        char username[32];
         char passwordHash[256];
 
         printf("0 to regist, 1 to login\n");
@@ -162,34 +163,36 @@ int main(int argc, char* argv[])
         switch (choice)
         {
         case 0:
-            
-            bzero(sendMessage, sizeof(struct sendMessageToServer));
+            struct sendMessageToServer *registMessage;
+            registMessage = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
+            bzero(registMessage, sizeof(struct sendMessageToServer));
 
             printf("Please set a username:");
-            scanf("%s", username);
+            scanf("%s", loggedinUsername);
             printf("Please set a password:");
             scanf("%s", passwordHash);
 
-            sendMessage->command = 0;
-            strcpy(sendMessage->username, username);
-            strcpy(sendMessage->passwordHash, passwordHash);
-            send(serverFD, sendMessage, sizeof(struct sendMessageToServer), 0);
+            registMessage->command = 0;
+            strcpy(registMessage->username, loggedinUsername);
+            strcpy(registMessage->passwordHash, passwordHash);
+            send(serverFD, registMessage, sizeof(struct sendMessageToServer), 0);
             sleep(1);
             break;
         
         case 1:
-            
-            bzero(sendMessage, sizeof(struct sendMessageToServer));
+            struct sendMessageToServer *loginMessage;
+            loginMessage = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
+            bzero(loginMessage, sizeof(struct sendMessageToServer));
 
             printf("Please enter username:");
-            scanf("%s", username);
+            scanf("%s", loggedinUsername);
             printf("Please enter password:");
             scanf("%s", passwordHash);
 
-            sendMessage->command = 1;
-            strcpy(sendMessage->username, username);
-            strcpy(sendMessage->passwordHash, passwordHash);
-            send(serverFD, sendMessage, sizeof(struct sendMessageToServer), 0);
+            loginMessage->command = 1;
+            strcpy(loginMessage->username, loggedinUsername);
+            strcpy(loginMessage->passwordHash, passwordHash);
+            send(serverFD, loginMessage, sizeof(struct sendMessageToServer), 0);
             sleep(1);
             break;
 
@@ -199,6 +202,62 @@ int main(int argc, char* argv[])
         }
 
     }
+    
+    bool exit = false;
+    while(!exit)
+    {
+        int choice;
+        printf("2 to send message, 3 to broadcast a message, 4 to exit\n");
+        scanf("%d", &choice);
+        switch (choice)
+        {
+        case 2:
+            char personUsername[32];
+            char privateMessage[512];
+
+            printf("Please input username you want to send message to:");
+            scanf("%s", personUsername);
+            printf("Please input message:");
+            scanf("%s", privateMessage);
+
+            struct sendMessageToServer *personMessage;
+            personMessage = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
+            bzero(personMessage, sizeof(struct sendMessageToServer));
+
+            personMessage->command = 2;
+            strcpy(personMessage->message, privateMessage);
+            strcpy(personMessage->sendToName, personUsername);
+            strcpy(personMessage->username, loggedinUsername);
+
+            printf("Message is supposed to send to %s\n", personUsername);
+            printf("Message is sending to %s\n", personMessage->sendToName);
+
+            send(serverFD, personMessage, sizeof(struct sendMessageToServer), 0);
+            break;
+        
+        case 3:
+            char broadcastMessage[512];
+
+            printf("Please input broadcast message:");
+            scanf("%s", broadcastMessage);
+
+            struct sendMessageToServer *publicMessage;
+            publicMessage = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
+            bzero(publicMessage, sizeof(struct sendMessageToServer));
+
+            publicMessage->command = 3;
+            strcpy(publicMessage->message, broadcastMessage);
+            
+
+            send(serverFD, publicMessage, sizeof(struct sendMessageToServer), 0);
+            break;
+        case 4:
+            exit = true;
+            pthread_cancel(id);
+            break;
+        }
+    }
+    
 
     pthread_join(id, NULL);
 

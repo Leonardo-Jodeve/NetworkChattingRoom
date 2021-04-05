@@ -28,8 +28,6 @@ struct receiveMessageFromClient
     char username[32];
     char passwordHash[256];
 
-    int token;
-
     char sendToName[32];
     char message[512];
 };
@@ -63,24 +61,33 @@ void addOnlineUser(struct onlineUser *newOnline)
     {
         newOnline->next == NULL;
         head = newOnline;
+        printf("Init online user success, name is %s\n", newOnline->username);
     }
     else
     {
         newOnline->next = head->next;
         head->next = newOnline;
+        printf("add online user success, name is %s\n", newOnline->username);
     }
 }
 
-int findOnlineUser(char* username)
+int findOnlineUser(char username[32])
 {
     struct onlineUser *temp;
     temp = head;
+    printf("Find init success\n");
     while(temp != NULL)
     {
         if(strcmp(username, temp->username) == 0)
         {
+            printf("Find the user %s, clientFD is %d", username, temp->clientFD);
             return temp->clientFD;
         }
+        else
+        {
+            printf("User %s, clientFD is %d, doesn't match %s", temp->username, temp->clientFD, username);
+        }
+        temp = temp->next;
     }
     return -1;
 }
@@ -123,10 +130,12 @@ void * receiveMessage(void * arg)
             break;
         case 1:
             printf("Received login request!\n");
+            printf("login username %s\n", receivedMessage->username);
             struct onlineUser *newUser;
             newUser = (struct onlineUser *)malloc(sizeof(struct onlineUser));
             newUser->clientFD = clientFD;
             strcpy(newUser->username,receivedMessage->username);
+            printf("new user added, name is %s\n", newUser->username);
             addOnlineUser(newUser);
             struct sendMessageToClient *message;
             message = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
@@ -134,6 +143,41 @@ void * receiveMessage(void * arg)
             message->result = 0;
             send(clientFD, message, sizeof(struct sendMessageToClient), 0);
             break;
+        case 2:
+            printf("Received send message to person request!\n");
+            printf("this message is send to %s\n", receivedMessage->sendToName);
+            printf("this message is from %s\n", receivedMessage->username);
+            struct sendMessageToClient *messageToPerson;
+            messageToPerson = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+            messageToPerson->command = 2;
+            messageToPerson->result = 0;
+            strcpy(messageToPerson->receiveFromName, receivedMessage->username);
+            strcpy(messageToPerson->message, receivedMessage->message);
+            printf("Generate message to person success!\n");
+            {
+                int sendToFD;
+                sendToFD = findOnlineUser(receivedMessage->sendToName);
+                if(sendToFD != -1)
+                {
+                    send(sendToFD, messageToPerson, sizeof(struct sendMessageToClient), 0);
+                    printf("Send message to person success!\n");
+                    break;
+                }
+                else
+                {
+                    messageToPerson->result = -1;
+                    printf("Send message to person failed!\n");
+                    send(clientFD, messageToPerson, sizeof(struct sendMessageToClient), 0);
+                }
+            }
+            break;
+            
+        case 3:
+            printf("Received send broadcast message request!\n");
+            struct sendMessageToClient *broadcastMessage;
+            broadcastMessage = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+
+
         }
 
         usleep(3);
