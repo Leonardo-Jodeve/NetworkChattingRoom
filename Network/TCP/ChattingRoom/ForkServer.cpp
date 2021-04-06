@@ -61,28 +61,31 @@ struct receiveFunctionArgs
     sqlite3* db;
 };
 
-struct onlineUser *head = NULL;
+struct onlineUser *head = (struct onlineUser *)malloc(sizeof(struct onlineUser));
 
 void addOnlineUser(struct onlineUser *newOnline)
 {
-    if(head == NULL)
-    {
-        newOnline->next == NULL;
-        head = newOnline;
-        printf("Init online user success, name is %s\n", newOnline->username);
-    }
-    else
-    {
-        newOnline->next = head->next;
-        head->next = newOnline;
-        printf("add online user success, name is %s\n", newOnline->username);
-    }
+    newOnline->next = head->next;
+    head->next = newOnline;
+    // if(head == NULL)
+    // {
+    //     newOnline->next == NULL;
+    //     head = newOnline;
+    //     printf("Init online user success, name is %s\n", newOnline->username);
+    // }
+    // else
+    // {
+    //     newOnline->next = head->next;
+    //     head->next = newOnline;
+    //     printf("add online user success, name is %s\n", newOnline->username);
+    // }
 }
 
 int findOnlineUser(char username[32])
 {
     struct onlineUser *temp;
-    temp = head;
+    temp = (struct onlineUser *)malloc(sizeof(struct onlineUser));
+    temp = head->next;
     while(temp != NULL)
     {
         if(strcmp(username, temp->username) == 0)
@@ -93,6 +96,37 @@ int findOnlineUser(char username[32])
         temp = temp->next;
     }
     return -1;
+}
+
+int deleteOnlineUser(int closedClientFD)
+{
+    bool isDeleted = false;
+    struct onlineUser* prevTemp;
+    struct onlineUser* temp;
+    prevTemp = (struct onlineUser *)malloc(sizeof(struct onlineUser));
+    temp = (struct onlineUser *)malloc(sizeof(struct onlineUser));
+    prevTemp = head;
+    temp = head->next;
+    while(temp != NULL)
+    {
+        if(temp->clientFD == closedClientFD)
+        {
+            prevTemp->next = temp->next;
+            printf("Clint %d is offline now!\n", closedClientFD);
+            isDeleted = true;
+            break;
+        }
+        prevTemp = prevTemp->next;
+        temp = temp->next;
+    }
+    if(isDeleted)
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
 }
 
 
@@ -133,7 +167,6 @@ int checkUsernameAvailiable(sqlite3* db, char username[32])
     {
         return 0;
     }
-    
 }
 
 int Regist(sqlite3* db, char username[32], char password[256])
@@ -227,6 +260,8 @@ void * receiveMessage(void * arg)
         if(receivedCount == 0)
         {
             printf("Client %d has been shutdown\n", clientFD);
+            deleteOnlineUser(clientFD);
+            shutdown(clientFD, SHUT_RDWR);
             pthread_exit(NULL);
         }
         /**
@@ -345,6 +380,23 @@ void * receiveMessage(void * arg)
                 printf("Received send broadcast message request!\n");
                 struct sendMessageToClient *broadcastMessage;
                 broadcastMessage = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+                broadcastMessage->command = 3;
+                strcpy(broadcastMessage->message, receivedMessage->message);
+                strcpy(broadcastMessage->receiveFromName, receivedMessage->username);
+                broadcastMessage->result = 0;
+                struct onlineUser *currentSendTo;
+                currentSendTo = (struct onlineUser *)malloc(sizeof(struct onlineUser));
+                currentSendTo = head->next;
+
+                while(currentSendTo != NULL)
+                {
+                    if(strcmp(currentSendTo->username, receivedMessage->username) != 0)
+                    {
+                        send(currentSendTo->clientFD, broadcastMessage, sizeof(struct sendMessageToClient), 0);
+                    }
+                    currentSendTo = currentSendTo->next;
+                }
+                
                 break;
             }
         
@@ -434,7 +486,7 @@ int main(int argc, char* argv[])
         usleep(3);
         
     }
-    
 
+    
     return 0;
 }

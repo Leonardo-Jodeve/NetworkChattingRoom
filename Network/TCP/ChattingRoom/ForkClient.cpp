@@ -65,7 +65,6 @@ void * receiveMessage(void* arg)
 
     while (1)
     {
-        printf("hello!\n");
         bzero(receivedMessage, sizeof(struct receiveMessageFromServer));
 
         receivedLength = recv(serverFD, receivedMessage, sizeof(struct receiveMessageFromServer), 0);
@@ -87,10 +86,10 @@ void * receiveMessage(void* arg)
                 isLogin = true;
                 break;
             case 2:
-                printf("%s send you a message:%s", receivedMessage->receiveFromName, receivedMessage->message);
+                printf("%s send you a message:%s\n", receivedMessage->receiveFromName, receivedMessage->message);
                 break;
             case 3:
-                printf("%s broadcast a message:%s", receivedMessage->receiveFromName, receivedMessage->message);\
+                printf("%s broadcast a message:%s\n", receivedMessage->receiveFromName, receivedMessage->message);
                 break;
             }
         }
@@ -109,14 +108,13 @@ void * receiveMessage(void* arg)
                 memset(loggedinUsername,0,sizeof(loggedinUsername));
                 break;
             case 2:
-                printf("Send message failed!\n");
+                printf("Send private message failed!\n");
                 break;
             case 3:
                 printf("Send broadcast message failed!\n");
                 break;
             }
         }
-
     }
 }
 
@@ -159,11 +157,10 @@ int main(int argc, char* argv[])
 
     while(! isLogin)
     {
-        int choice;
-        char passwordHash[256];
+        int choice = -1;
+        char password[256];
 
-        printf("0 to regist, 1 to login\n");
-        scanf("%d", &choice);
+
         switch (choice)
         {
         case 0:
@@ -174,11 +171,11 @@ int main(int argc, char* argv[])
             printf("Please set a username:");
             scanf("%s", loggedinUsername);
             printf("Please set a password:");
-            scanf("%s", passwordHash);
+            scanf("%s", password);
 
             registMessage->command = 0;
             strcpy(registMessage->username, loggedinUsername);
-            strcpy(registMessage->password, passwordHash);
+            strcpy(registMessage->password, password);
             send(serverFD, registMessage, sizeof(struct sendMessageToServer), 0);
             sleep(1);
             break;
@@ -191,18 +188,18 @@ int main(int argc, char* argv[])
             printf("Please enter username:");
             scanf("%s", loggedinUsername);
             printf("Please enter password:");
-            scanf("%s", passwordHash);
+            scanf("%s", password);
 
             loginMessage->command = 1;
             strcpy(loginMessage->username, loggedinUsername);
-            strcpy(loginMessage->password, passwordHash);
+            strcpy(loginMessage->password, password);
             send(serverFD, loginMessage, sizeof(struct sendMessageToServer), 0);
             sleep(1);
             break;
 
         default:
             printf("Error, please input correct choice!\n");
-            continue;
+            break;
         }
 
     }
@@ -210,7 +207,7 @@ int main(int argc, char* argv[])
     bool exit = false;
     while(!exit)
     {
-        int choice;
+        int choice = -1;
         printf("2 to send message, 3 to broadcast a message, 4 to exit\n");
         scanf("%d", &choice);
         switch (choice)
@@ -251,19 +248,20 @@ int main(int argc, char* argv[])
 
             publicMessage->command = 3;
             strcpy(publicMessage->message, broadcastMessage);
-            
-
+            strcpy(publicMessage->username, loggedinUsername);
             send(serverFD, publicMessage, sizeof(struct sendMessageToServer), 0);
             break;
         case 4:
             exit = true;
             pthread_cancel(id);
             break;
+        default:
+            {
+                printf("Error, please input correct choice!\n");
+                break;
+            }
         }
     }
-    
-
-    pthread_join(id, NULL);
 
     shutdown(serverFD, SHUT_RDWR);
 
