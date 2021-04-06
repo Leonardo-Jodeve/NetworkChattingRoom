@@ -25,6 +25,7 @@ struct receiveMessageFromClient
      * 1. login
      * 2. send message to somebody
      * 3. send message to everyone who are online
+     * 4. request online users
      * etc;
     */
     char username[32];
@@ -399,7 +400,25 @@ void * receiveMessage(void * arg)
                 
                 break;
             }
-        
+        case 4:
+            {
+                printf("Received request online users!\n");
+                struct sendMessageToClient *sendOnlineUsers;
+                sendOnlineUsers = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+                sendOnlineUsers->command = 4;
+                sendOnlineUsers->result = 0;
+
+                struct onlineUser *currentOnline;
+                currentOnline = (struct onlineUser *)malloc(sizeof(struct onlineUser));
+                currentOnline = head->next;
+                while(currentOnline != NULL)
+                {
+                    memset(sendOnlineUsers->message, 0, sizeof(sendOnlineUsers->message));
+                    strcpy(sendOnlineUsers->message, currentOnline->username);
+                    send(clientFD, sendOnlineUsers, sizeof(struct sendMessageToClient), 0);
+                    currentOnline = currentOnline->next;
+                }
+            }
         }
 
         usleep(3);

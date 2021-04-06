@@ -24,6 +24,7 @@ struct sendMessageToServer
      * 1. login
      * 2. send message to somebody
      * 3. send message to everyone who are online
+     * 4. request online users
      * etc;
     */
     char username[32];
@@ -42,6 +43,7 @@ struct receiveMessageFromServer
      * 1. login
      * 2. receive message from somebody
      * 3. receive message from broadcast
+     * 4. receive online users
      * etc;
     */
     int result;
@@ -82,6 +84,14 @@ void OperationGui()
     printf("        Your choice is:");
 }
 
+void RequestOnlineUsers(int* serverFD)
+{
+    struct sendMessageToServer *requestOnlineUser;
+    requestOnlineUser = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
+    requestOnlineUser->command = 4;
+    send(*serverFD, requestOnlineUser, sizeof(struct sendMessageToServer), 0);
+}
+
 void * receiveMessage(void* arg)
 {
     int serverFD = *((int*)arg);
@@ -118,6 +128,11 @@ void * receiveMessage(void* arg)
             case 3:
                 printf("%s broadcast a message:%s\n", receivedMessage->receiveFromName, receivedMessage->message);
                 break;
+            case 4:
+                {
+                    printf("current online: %s", receivedMessage->message);
+                    break;
+                }
             }
         }
         else
@@ -179,6 +194,7 @@ int main(int argc, char* argv[])
      * 1. login
      * 2. receive message from somebody
      * 3. receive message from broadcast
+     * 4. receive online users
      * etc;
     */
 
@@ -284,45 +300,63 @@ int main(int argc, char* argv[])
         switch (choice)
         {
         case 2:
-            char personUsername[32];
-            char privateMessage[512];
+            {
+                RequestOnlineUsers(&serverFD);
 
-            printf("Please input username you want to send message to:");
-            scanf("%s", personUsername);
-            printf("Please input message:");
-            scanf("%s", privateMessage);
+                char personUsername[32];
+                char privateMessage[512];
 
-            struct sendMessageToServer *personMessage;
-            personMessage = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
-            bzero(personMessage, sizeof(struct sendMessageToServer));
+                usleep(100);
+                printf("Please input username you want to send message to:");
+                scanf("%s", personUsername);
+                printf("Please input message:");
+                scanf("%s", privateMessage);
 
-            personMessage->command = 2;
-            strcpy(personMessage->message, privateMessage);
-            strcpy(personMessage->sendToName, personUsername);
-            strcpy(personMessage->username, loggedinUsername);
+                struct sendMessageToServer *personMessage;
+                personMessage = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
+                bzero(personMessage, sizeof(struct sendMessageToServer));
 
-            send(serverFD, personMessage, sizeof(struct sendMessageToServer), 0);
-            break;
-        
+                personMessage->command = 2;
+                strcpy(personMessage->message, privateMessage);
+                strcpy(personMessage->sendToName, personUsername);
+                strcpy(personMessage->username, loggedinUsername);
+
+                send(serverFD, personMessage, sizeof(struct sendMessageToServer), 0);
+                break;
+            }
+            
         case 3:
-            char broadcastMessage[512];
+            {
+                RequestOnlineUsers(&serverFD);
 
-            printf("Please input broadcast message:");
-            scanf("%s", broadcastMessage);
+                struct sendMessageToServer *requestOnlineUser;
+                requestOnlineUser = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
+                requestOnlineUser->command = 4;
+                send(serverFD, requestOnlineUser, sizeof(struct sendMessageToServer), 0);
 
-            struct sendMessageToServer *publicMessage;
-            publicMessage = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
-            bzero(publicMessage, sizeof(struct sendMessageToServer));
+                char broadcastMessage[512];
 
-            publicMessage->command = 3;
-            strcpy(publicMessage->message, broadcastMessage);
-            strcpy(publicMessage->username, loggedinUsername);
-            send(serverFD, publicMessage, sizeof(struct sendMessageToServer), 0);
-            break;
+                printf("Please input broadcast message:");
+                scanf("%s", broadcastMessage);
+
+                struct sendMessageToServer *publicMessage;
+                publicMessage = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
+                bzero(publicMessage, sizeof(struct sendMessageToServer));
+
+                publicMessage->command = 3;
+                strcpy(publicMessage->message, broadcastMessage);
+                strcpy(publicMessage->username, loggedinUsername);
+                send(serverFD, publicMessage, sizeof(struct sendMessageToServer), 0);
+                break;
+            }
+            
         case 4:
-            wantExit = true;
-            pthread_cancel(id);
-            break;
+            {
+                wantExit = true;
+                pthread_cancel(id);
+                break;
+            }
+            
         default:
             {
                 printf("Error, please input correct choice!\n");
