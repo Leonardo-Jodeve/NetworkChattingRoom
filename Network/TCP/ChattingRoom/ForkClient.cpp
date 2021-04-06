@@ -27,7 +27,7 @@ struct sendMessageToServer
      * etc;
     */
     char username[32];
-    char passwordHash[256];
+    char password[256];
 
     char sendToName[32];
     char message[512];
@@ -97,6 +97,7 @@ void * receiveMessage(void* arg)
             {
             case 0:
                 printf("Regist failed\n");
+                printf("%s", receivedMessage->message);
                 break;
             
             case 1:
@@ -174,7 +175,7 @@ int main(int argc, char* argv[])
 
             registMessage->command = 0;
             strcpy(registMessage->username, loggedinUsername);
-            strcpy(registMessage->passwordHash, passwordHash);
+            strcpy(registMessage->password, passwordHash);
             send(serverFD, registMessage, sizeof(struct sendMessageToServer), 0);
             sleep(1);
             break;
@@ -191,7 +192,7 @@ int main(int argc, char* argv[])
 
             loginMessage->command = 1;
             strcpy(loginMessage->username, loggedinUsername);
-            strcpy(loginMessage->passwordHash, passwordHash);
+            strcpy(loginMessage->password, passwordHash);
             send(serverFD, loginMessage, sizeof(struct sendMessageToServer), 0);
             sleep(1);
             break;

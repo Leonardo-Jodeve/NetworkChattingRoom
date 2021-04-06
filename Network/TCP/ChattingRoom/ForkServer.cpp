@@ -11,6 +11,8 @@
 
 #include <pthread.h>
 
+#include <sqlite3.h>
+
 #define PORT 32768
 
 
@@ -26,7 +28,7 @@ struct receiveMessageFromClient
      * etc;
     */
     char username[32];
-    char passwordHash[256];
+    char password[256];
 
     char sendToName[32];
     char message[512];
@@ -53,6 +55,12 @@ struct onlineUser
     struct onlineUser *next;
 };
 
+struct receiveFunctionArgs
+{
+    int clientFD;
+    sqlite3* db;
+};
+
 struct onlineUser *head = NULL;
 
 void addOnlineUser(struct onlineUser *newOnline)
@@ -75,36 +83,142 @@ int findOnlineUser(char username[32])
 {
     struct onlineUser *temp;
     temp = head;
-    printf("Find init success\n");
     while(temp != NULL)
     {
         if(strcmp(username, temp->username) == 0)
         {
-            printf("Find the user %s, clientFD is %d", username, temp->clientFD);
+            printf("Find the user %s, clientFD is %d\n", username, temp->clientFD);
             return temp->clientFD;
-        }
-        else
-        {
-            printf("User %s, clientFD is %d, doesn't match %s", temp->username, temp->clientFD, username);
         }
         temp = temp->next;
     }
     return -1;
 }
 
+
+sqlite3* OpenDatabase(char* filename)
+{
+    sqlite3 *db;
+    int openResult;
+
+    openResult = sqlite3_open("UserDB.db", &db);
+    if(openResult != SQLITE_OK)
+    {
+        printf("User database open error! %s", sqlite3_errmsg(db));
+        exit(1);
+    }
+    printf("Database open success!\n");
+    return db;
+}
+
+int checkUsernameAvailiable(sqlite3* db, char username[32])
+{
+    char selectUserSql[1024];
+    char** selectedResult;
+    char* selectError;
+    int selectedRow = 0;
+    int selectedColumn = 0;
+    
+    sprintf(selectUserSql, "select * from user where username = '%s'", username);
+    
+    sqlite3_get_table(db, selectUserSql, &selectedResult, &selectedRow, &selectedColumn, &selectError);
+
+    printf("Selected %d rows!", selectedRow);
+
+    if(selectedRow != 0)
+    {
+        return -1;
+    }
+    else
+    {
+        return 0;
+    }
+    
+}
+
+int Regist(sqlite3* db, char username[32], char password[256])
+{
+    char registUserSql[1024];
+    char** selectedResult;
+    int selectedRow = 0;
+    int selectedColumn = 0;
+    char* selectError;
+
+    memset(registUserSql, 0, sizeof(registUserSql));
+
+    sqlite3_get_table(db, "select * from user", &selectedResult, &selectedRow, &selectedColumn, &selectError);
+
+    int ID = atoi(selectedResult[(selectedColumn * selectedRow)]) + 1;
+
+
+    int registResult;
+    char* insertError;
+    sprintf(registUserSql, "insert into user(ID, username, password, privilege) values(%d, '%s', '%s', 1)", ID, username, password);
+    registResult = sqlite3_exec(db, registUserSql, NULL, NULL, &insertError);
+
+    if(registResult != SQLITE_OK)
+    {
+        printf("Regist Error! %s", sqlite3_errmsg(db));
+        return -1;
+        exit(1);
+    }
+
+    return 0;
+}
+
+int Login(sqlite3* db, char username[32], char password[256])
+{
+    char loginSql[1024];
+    char** selectedResult;
+    int selectedRow = 0;
+    int selectedColumn = 0;
+    char* loginError;
+
+    memset(loginSql, 0, sizeof(loginSql));
+
+    sprintf(loginSql, "select * from user where userName = '%s' AND password = '%s'", username, password);
+
+    int selectResult;
+    selectResult = sqlite3_get_table(db, loginSql, &selectedResult, &selectedRow, &selectedColumn, &loginError);
+
+    printf("Selected %d rows", selectedRow);
+    if(strcmp(selectedResult[selectedColumn + 2], password) == 0)
+    {
+        printf("Login successfully!\n");
+    }
+    else
+    {
+        printf("Wrong password\n");
+        return -1;
+    }
+    if(atoi(selectedResult[selectedRow * selectedColumn + 3]) == 0)
+    {
+        return 0;
+    }
+    if(atoi(selectedResult[selectedRow * selectedColumn + 3]) == 1)
+    {
+        return 1;
+    }
+    return -1;
+}
+
 void * receiveMessage(void * arg)
 {
-    printf("Init success\n");
-    int clientFD = *((int *)arg);
+    printf("Server start receiving message!\n");
+
+    int clientFD = ((struct receiveFunctionArgs *)arg)->clientFD;
+    sqlite3* db = ((struct receiveFunctionArgs *)arg)->db;
+
     int receivedCount;
     
     struct receiveMessageFromClient *receivedMessage;
     receivedMessage = (struct receiveMessageFromClient *)malloc(sizeof(struct receiveMessageFromClient));
-    bzero(receivedMessage, sizeof(struct receiveMessageFromClient));
-
+    
 
     while (1)
     {
+        bzero(receivedMessage, sizeof(struct receiveMessageFromClient));
+
         if((receivedCount = recv(clientFD, receivedMessage, sizeof(struct receiveMessageFromClient), 0)) < 0)
         {
             perror("Receive error!");
@@ -126,58 +240,97 @@ void * receiveMessage(void * arg)
         switch (receivedMessage->command)
         {
         case 0:
-            
-            break;
-        case 1:
-            printf("Received login request!\n");
-            printf("login username %s\n", receivedMessage->username);
-            struct onlineUser *newUser;
-            newUser = (struct onlineUser *)malloc(sizeof(struct onlineUser));
-            newUser->clientFD = clientFD;
-            strcpy(newUser->username,receivedMessage->username);
-            printf("new user added, name is %s\n", newUser->username);
-            addOnlineUser(newUser);
-            struct sendMessageToClient *message;
-            message = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
-            message->command = 1;
-            message->result = 0;
-            send(clientFD, message, sizeof(struct sendMessageToClient), 0);
-            break;
-        case 2:
-            printf("Received send message to person request!\n");
-            printf("this message is send to %s\n", receivedMessage->sendToName);
-            printf("this message is from %s\n", receivedMessage->username);
-            struct sendMessageToClient *messageToPerson;
-            messageToPerson = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
-            messageToPerson->command = 2;
-            messageToPerson->result = 0;
-            strcpy(messageToPerson->receiveFromName, receivedMessage->username);
-            strcpy(messageToPerson->message, receivedMessage->message);
-            printf("Generate message to person success!\n");
             {
-                int sendToFD;
-                sendToFD = findOnlineUser(receivedMessage->sendToName);
-                if(sendToFD != -1)
+                printf("Received regist request!\n");
+                printf("Regist username is %s\n", receivedMessage->username);
+                int availiable = checkUsernameAvailiable(db, receivedMessage->username);
+                if(availiable == -1)
                 {
-                    send(sendToFD, messageToPerson, sizeof(struct sendMessageToClient), 0);
-                    printf("Send message to person success!\n");
-                    break;
+                    printf("Username has been taken by someone!\n");
+                    struct sendMessageToClient *registError;
+                    registError = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+                    registError->command = 0;
+                    registError->result = -1;
+                    strcpy(registError->message, "Username has been taken by someone!\n");
+
+                    send(clientFD, registError, sizeof(struct sendMessageToClient), 0);
                 }
                 else
                 {
-                    messageToPerson->result = -1;
-                    printf("Send message to person failed!\n");
-                    send(clientFD, messageToPerson, sizeof(struct sendMessageToClient), 0);
+                    int registResult;
+                    registResult = Regist(db, receivedMessage->username, receivedMessage->password);
+                    if(registResult == 0)
+                    {
+                        struct sendMessageToClient *registSuccess;
+                        registSuccess = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+
+                        registSuccess->result = 0;
+                        registSuccess->command = 0;
+
+                        send(clientFD, registSuccess, sizeof(struct sendMessageToClient), 0);
+                    }
+
                 }
+                break;
             }
-            break;
+            
+        case 1:
+            {
+                printf("Received login request!\n");
+                printf("login username %s\n", receivedMessage->username);
+                struct onlineUser *newUser;
+                newUser = (struct onlineUser *)malloc(sizeof(struct onlineUser));
+                newUser->clientFD = clientFD;
+                strcpy(newUser->username,receivedMessage->username);
+                printf("new user added, name is %s\n", newUser->username);
+                addOnlineUser(newUser);
+                struct sendMessageToClient *message;
+                message = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+                message->command = 1;
+                message->result = 0;
+                send(clientFD, message, sizeof(struct sendMessageToClient), 0);
+                break;
+            }
+            
+        case 2:
+            {
+                printf("Received send message to person request!\n");
+                printf("this message is send to %s\n", receivedMessage->sendToName);
+                printf("this message is from %s\n", receivedMessage->username);
+                struct sendMessageToClient *messageToPerson;
+                messageToPerson = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+                messageToPerson->command = 2;
+                messageToPerson->result = 0;
+                strcpy(messageToPerson->receiveFromName, receivedMessage->username);
+                strcpy(messageToPerson->message, receivedMessage->message);
+                printf("Generate message to person success!\n");
+                {
+                    int sendToFD;
+                    sendToFD = findOnlineUser(receivedMessage->sendToName);
+                    if(sendToFD != -1)
+                    {
+                        send(sendToFD, messageToPerson, sizeof(struct sendMessageToClient), 0);
+                        printf("Send message to person success!\n");
+                        break;
+                    }
+                    else
+                    {
+                        messageToPerson->result = -1;
+                        printf("Send message to person failed!\n");
+                        send(clientFD, messageToPerson, sizeof(struct sendMessageToClient), 0);
+                    }
+                }
+                break;
+            }
+            
             
         case 3:
-            printf("Received send broadcast message request!\n");
-            struct sendMessageToClient *broadcastMessage;
-            broadcastMessage = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
-
-
+            {
+                printf("Received send broadcast message request!\n");
+                struct sendMessageToClient *broadcastMessage;
+                broadcastMessage = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+            }
+        
         }
 
         usleep(3);
@@ -200,6 +353,8 @@ int main(int argc, char* argv[])
     char buffer[1024];
 
     pthread_t id;
+
+    sqlite3* db = OpenDatabase("./UserDB.db");
     
     socketFD = socket(AF_INET, SOCK_STREAM, 0);
     if(socketFD == -1)
@@ -250,7 +405,14 @@ int main(int argc, char* argv[])
         }
         printf("Accept success!\n");
 
-        pthread_create(&id, NULL, receiveMessage, (void *)&clientFD);
+        struct receiveFunctionArgs *arg;
+        arg = (struct receiveFunctionArgs *)malloc(sizeof(struct receiveFunctionArgs));
+        bzero(arg, sizeof(struct receiveFunctionArgs));
+
+        arg->clientFD = clientFD;
+        arg->db = db;
+
+        pthread_create(&id, NULL, receiveMessage, (void *)arg);
 
         usleep(3);
         
