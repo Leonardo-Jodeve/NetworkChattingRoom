@@ -265,13 +265,13 @@ void * receiveMessage(void * arg)
             pthread_exit(NULL);
         }
         /**
-     * command list:
-     * 0. regist
-     * 1. login
-     * 2. send message to somebody
-     * 3. send message to everyone who are online
-     * etc;
-    */
+         * command list:
+         * 0. regist
+         * 1. login
+         * 2. send message to somebody
+         * 3. send message to everyone who are online
+         * etc;
+         */
         switch (receivedMessage->command)
         {
         case 0:

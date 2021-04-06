@@ -55,6 +55,33 @@ struct receiveMessageFromServer
     char message[512];
 };
 
+void LoginGui()
+{
+    printf(" ____________________________________________ \n");
+    printf("|                                            |\n");
+    printf("|         Please choose an operation:        |\n");
+    printf("|--------------------------------------------|\n");
+    printf("|     1. \"reg\" to regist a new account       |\n");
+    printf("|     2. \"log\" to login                      |\n");
+    printf("|____________________________________________|\n");
+    printf("\n");
+    printf("          Your choice is:");
+}
+
+void OperationGui()
+{
+    printf(" ____________________________________________________ \n");
+    printf("|                                                    |\n");
+    printf("|            Please choose an operation:             |\n");
+    printf("|----------------------------------------------------|\n");
+    printf("|  1. \"send\" to send a private message to somebody   |\n");
+    printf("|  2. \"all\" to send a broadcast message              |\n");
+    printf("|  3. \"exit\" to exit the program                     |\n");
+    printf("|____________________________________________________|\n");
+    printf("\n");
+    printf("        Your choice is:");
+}
+
 void * receiveMessage(void* arg)
 {
     int serverFD = *((int*)arg);
@@ -146,7 +173,7 @@ int main(int argc, char* argv[])
 
     pthread_create(&id, NULL, receiveMessage, (void *)(&serverFD));
 
-/**
+    /**
      * command list:
      * 0. regist
      * 1. login
@@ -164,9 +191,7 @@ int main(int argc, char* argv[])
 
         while(1)
         {
-            printf("Please choice an operation:\n");
-            printf("\"reg\" to regist a new account\n");
-            printf("\"log\" to login\n");
+            LoginGui();
             scanf("%s", choiceString);
 
             if(strcmp(choiceString, "reg") == 0)
@@ -182,6 +207,7 @@ int main(int argc, char* argv[])
             printf("Error, please input correct choice!\n");
         }
 
+        system("clear");
         switch (choice)
         {
         case 0:
@@ -234,10 +260,7 @@ int main(int argc, char* argv[])
 
         while(1)
         {
-            printf("Please choice an operation:\n");
-            printf("\"send\" to send a private message to somebody\n");
-            printf("\"all\" to send a broadcast message\n");
-            printf("\"exit\" to exit the program\n");
+            OperationGui();
             scanf("%s", choiceString);
 
             if(strcmp(choiceString, "send") == 0)
@@ -250,7 +273,7 @@ int main(int argc, char* argv[])
                 choice = 3;
                 break;
             }
-            if(strcmp(choiceString, "all") == 0)
+            if(strcmp(choiceString, "exit") == 0)
             {
                 choice = 4;
                 break;
@@ -277,9 +300,6 @@ int main(int argc, char* argv[])
             strcpy(personMessage->message, privateMessage);
             strcpy(personMessage->sendToName, personUsername);
             strcpy(personMessage->username, loggedinUsername);
-
-            printf("Message is supposed to send to %s\n", personUsername);
-            printf("Message is sending to %s\n", personMessage->sendToName);
 
             send(serverFD, personMessage, sizeof(struct sendMessageToServer), 0);
             break;
