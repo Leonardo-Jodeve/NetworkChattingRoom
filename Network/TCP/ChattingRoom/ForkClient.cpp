@@ -160,6 +160,27 @@ int main(int argc, char* argv[])
         int choice = -1;
         char password[256];
 
+        char choiceString[32];
+
+        while(1)
+        {
+            printf("Please choice an operation:\n");
+            printf("\"reg\" to regist a new account\n");
+            printf("\"log\" to login\n");
+            scanf("%s", choiceString);
+
+            if(strcmp(choiceString, "reg") == 0)
+            {
+                choice = 0;
+                break;
+            }
+            if(strcmp(choiceString, "log") == 0)
+            {
+                choice = 1;
+                break;
+            }
+            printf("Error, please input correct choice!\n");
+        }
 
         switch (choice)
         {
@@ -204,12 +225,39 @@ int main(int argc, char* argv[])
 
     }
     
-    bool exit = false;
-    while(!exit)
+    bool wantExit = false;
+    while(!wantExit)
     {
         int choice = -1;
-        printf("2 to send message, 3 to broadcast a message, 4 to exit\n");
-        scanf("%d", &choice);
+        
+        char choiceString[256];
+
+        while(1)
+        {
+            printf("Please choice an operation:\n");
+            printf("\"send\" to send a private message to somebody\n");
+            printf("\"all\" to send a broadcast message\n");
+            printf("\"exit\" to exit the program\n");
+            scanf("%s", choiceString);
+
+            if(strcmp(choiceString, "send") == 0)
+            {
+                choice = 2;
+                break;
+            }
+            if(strcmp(choiceString, "all") == 0)
+            {
+                choice = 3;
+                break;
+            }
+            if(strcmp(choiceString, "all") == 0)
+            {
+                choice = 4;
+                break;
+            }
+            printf("Error, please input correct choice!\n");
+        }
+        
         switch (choice)
         {
         case 2:
@@ -252,7 +300,7 @@ int main(int argc, char* argv[])
             send(serverFD, publicMessage, sizeof(struct sendMessageToServer), 0);
             break;
         case 4:
-            exit = true;
+            wantExit = true;
             pthread_cancel(id);
             break;
         default:
