@@ -65,6 +65,9 @@ void * receiveMessage(void* arg)
 
     while (1)
     {
+        printf("hello!\n");
+        bzero(receivedMessage, sizeof(struct receiveMessageFromServer));
+
         receivedLength = recv(serverFD, receivedMessage, sizeof(struct receiveMessageFromServer), 0);
         if(receivedLength == 0)
         {

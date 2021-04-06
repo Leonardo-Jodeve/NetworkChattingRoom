@@ -181,10 +181,10 @@ int Login(sqlite3* db, char username[32], char password[256])
     int selectResult;
     selectResult = sqlite3_get_table(db, loginSql, &selectedResult, &selectedRow, &selectedColumn, &loginError);
 
-    printf("Selected %d rows", selectedRow);
+    printf("Selected %d rows\n", selectedRow);
     if(strcmp(selectedResult[selectedColumn + 2], password) == 0)
     {
-        printf("Login successfully!\n");
+        printf("%s Login successfully!\n", username);
     }
     else
     {
@@ -277,18 +277,34 @@ void * receiveMessage(void * arg)
         case 1:
             {
                 printf("Received login request!\n");
-                printf("login username %s\n", receivedMessage->username);
-                struct onlineUser *newUser;
-                newUser = (struct onlineUser *)malloc(sizeof(struct onlineUser));
-                newUser->clientFD = clientFD;
-                strcpy(newUser->username,receivedMessage->username);
-                printf("new user added, name is %s\n", newUser->username);
-                addOnlineUser(newUser);
-                struct sendMessageToClient *message;
-                message = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
-                message->command = 1;
-                message->result = 0;
-                send(clientFD, message, sizeof(struct sendMessageToClient), 0);
+                printf("Attempt to login username is %s\n", receivedMessage->username);
+
+                int loginResult;
+                loginResult = Login(db, receivedMessage->username, receivedMessage->password);
+                if(loginResult != -1)
+                {
+                    struct onlineUser *newUser;
+                    newUser = (struct onlineUser *)malloc(sizeof(struct onlineUser));
+                    newUser->clientFD = clientFD;
+                    strcpy(newUser->username,receivedMessage->username);
+                    printf("new online user added, name is %s\n", newUser->username);
+                    addOnlineUser(newUser);
+                    struct sendMessageToClient *loginSuccessMessage;
+                    loginSuccessMessage = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+                    loginSuccessMessage->command = 1;
+                    loginSuccessMessage->result = 0;
+                    send(clientFD, loginSuccessMessage, sizeof(struct sendMessageToClient), 0);
+                    break;
+                }
+                else
+                {
+                    struct sendMessageToClient *loginFailedMessage;
+                    loginFailedMessage = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+                    loginFailedMessage->command = 1;
+                    loginFailedMessage->result = -1;
+                    send(clientFD, loginFailedMessage, sizeof(struct sendMessageToClient), 0);
+                    break;
+                }
                 break;
             }
             
@@ -329,6 +345,7 @@ void * receiveMessage(void * arg)
                 printf("Received send broadcast message request!\n");
                 struct sendMessageToClient *broadcastMessage;
                 broadcastMessage = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
+                break;
             }
         
         }
