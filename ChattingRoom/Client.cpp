@@ -7,6 +7,8 @@
 #include <errno.h>
 #include <pthread.h>
 
+#include <sqlite3.h>
+
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
@@ -57,6 +59,12 @@ struct receiveMessageFromServer
     char message[512];
 };
 
+struct receiveFunctionArgs
+{
+    int serverFD;
+    sqlite3* db;
+};
+
 void LoginGui()
 {
     printf(" ____________________________________________ \n");
@@ -84,6 +92,69 @@ void OperationGui()
     printf("        Your choice is:");
 }
 
+sqlite3* OpenDatabase(char* filename)
+{
+    sqlite3 *db;
+    int openResult;
+
+    openResult = sqlite3_open(filename, &db);
+    if(openResult != SQLITE_OK)
+    {
+        printf("Local database open error! %s", sqlite3_errmsg(db));
+        exit(1);
+    }
+    printf("Local database open success!\n");
+    return db;
+}
+
+int LogSend(sqlite3* db, struct sendMessageToServer *sent)
+{
+    char logSql[1024];
+
+    memset(logSql, 0, sizeof(logSql));
+
+    char* logError;
+    int logResult;
+
+    sprintf(logSql, "insert into send(command, username, password, sendToName, message) values(%d, '%s', '%s', '%s', '%s')",
+     sent->command, sent->username, sent->password, sent->sendToName, sent->message);
+    
+    logResult = sqlite3_exec(db, logSql, NULL, NULL, &logError);
+
+    if(logResult != SQLITE_OK)
+    {
+        printf("Log Error! %s", sqlite3_errmsg(db));
+        return -1;
+        exit(1);
+    }
+
+    return 0;
+}
+
+int LogReceived(sqlite3* db, struct receiveMessageFromServer *received)
+{
+    char logSql[1024];
+
+    memset(logSql, 0, sizeof(logSql));
+
+    char* logError;
+    int logResult;
+
+    sprintf(logSql, "insert into received(command, result, receiveFromName, message) values(%d, %d, '%s', '%s')",
+     received->command, received->result, received->receiveFromName, received->message);
+    
+    logResult = sqlite3_exec(db, logSql, NULL, NULL, &logError);
+
+    if(logResult != SQLITE_OK)
+    {
+        printf("Regist Error! %s", sqlite3_errmsg(db));
+        return -1;
+        exit(1);
+    }
+
+    return 0;
+}
+
 void RequestOnlineUsers(int* serverFD)
 {
     struct sendMessageToServer *requestOnlineUser;
@@ -94,7 +165,9 @@ void RequestOnlineUsers(int* serverFD)
 
 void * receiveMessage(void* arg)
 {
-    int serverFD = *((int*)arg);
+    int serverFD = ((struct receiveFunctionArgs *)arg)->serverFD;
+    sqlite3* db = ((struct receiveFunctionArgs *)arg)->db;
+
     int receivedLength;
     struct receiveMessageFromServer *receivedMessage;
     receivedMessage = (struct receiveMessageFromServer *)malloc(sizeof(struct receiveMessageFromServer));
@@ -113,6 +186,7 @@ void * receiveMessage(void* arg)
 
         if(receivedMessage->result == 0)
         {
+            LogReceived(db, receivedMessage);
             switch (receivedMessage->command)
             {
             case 0:
@@ -168,6 +242,8 @@ int main(int argc, char* argv[])
 
     pthread_t id;
 
+    sqlite3* db;
+
     serverFD = socket(AF_INET, SOCK_STREAM, 0);
     if(serverFD < 0)
     {
@@ -186,7 +262,15 @@ int main(int argc, char* argv[])
     }
     printf("Connect success!\n");
 
-    pthread_create(&id, NULL, receiveMessage, (void *)(&serverFD));
+    db = OpenDatabase((char *)"./LocalDB.db");
+
+    struct receiveFunctionArgs *arg;
+    arg = (struct receiveFunctionArgs *)malloc(sizeof(struct receiveFunctionArgs));
+    arg->db = db;
+    arg->serverFD = serverFD;
+
+
+    pthread_create(&id, NULL, receiveMessage, (void *)(arg));
 
     /**
      * command list:
@@ -240,6 +324,7 @@ int main(int argc, char* argv[])
             strcpy(registMessage->username, loggedinUsername);
             strcpy(registMessage->password, password);
             send(serverFD, registMessage, sizeof(struct sendMessageToServer), 0);
+            LogSend(db, registMessage);
             sleep(1);
             break;
         
@@ -257,6 +342,7 @@ int main(int argc, char* argv[])
             strcpy(loginMessage->username, loggedinUsername);
             strcpy(loginMessage->password, password);
             send(serverFD, loginMessage, sizeof(struct sendMessageToServer), 0);
+            LogSend(db, loginMessage);
             sleep(1);
             break;
 
@@ -322,6 +408,7 @@ int main(int argc, char* argv[])
                 strcpy(personMessage->username, loggedinUsername);
 
                 send(serverFD, personMessage, sizeof(struct sendMessageToServer), 0);
+                LogSend(db, personMessage);
                 break;
             }
             
@@ -344,6 +431,7 @@ int main(int argc, char* argv[])
                 strcpy(publicMessage->message, broadcastMessage);
                 strcpy(publicMessage->username, loggedinUsername);
                 send(serverFD, publicMessage, sizeof(struct sendMessageToServer), 0);
+                LogSend(db, publicMessage);
                 break;
             }
             

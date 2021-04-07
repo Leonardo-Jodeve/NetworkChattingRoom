@@ -55,6 +55,8 @@ struct onlineUser
     char username[32];
     struct onlineUser *next;
 };
+struct onlineUser *head = (struct onlineUser *)malloc(sizeof(struct onlineUser));
+
 
 struct receiveFunctionArgs
 {
@@ -62,24 +64,11 @@ struct receiveFunctionArgs
     sqlite3* db;
 };
 
-struct onlineUser *head = (struct onlineUser *)malloc(sizeof(struct onlineUser));
 
 void addOnlineUser(struct onlineUser *newOnline)
 {
     newOnline->next = head->next;
     head->next = newOnline;
-    // if(head == NULL)
-    // {
-    //     newOnline->next == NULL;
-    //     head = newOnline;
-    //     printf("Init online user success, name is %s\n", newOnline->username);
-    // }
-    // else
-    // {
-    //     newOnline->next = head->next;
-    //     head->next = newOnline;
-    //     printf("add online user success, name is %s\n", newOnline->username);
-    // }
 }
 
 int findOnlineUser(char username[32])
@@ -236,6 +225,30 @@ int Login(sqlite3* db, char username[32], char password[256])
     return -1;
 }
 
+int Log(sqlite3* db, struct receiveMessageFromClient * receivedMessage)
+{
+    char logSql[1024];
+
+    memset(logSql, 0, sizeof(logSql));
+
+    char* logError;
+    int logResult;
+
+    sprintf(logSql, "insert into log(command, username, password, sendToName, message) values(%d, '%s', '%s', '%s', '%s')",
+     receivedMessage->command, receivedMessage->username, receivedMessage->password, receivedMessage->sendToName, receivedMessage->message);
+    
+    logResult = sqlite3_exec(db, logSql, NULL, NULL, &logError);
+
+    if(logResult != SQLITE_OK)
+    {
+        printf("Log Error! %s", sqlite3_errmsg(db));
+        return -1;
+        exit(1);
+    }
+
+    return 0;
+}
+
 void currentOnlineList(char *list)
 {
     struct onlineUser *currentOnline;
@@ -293,6 +306,9 @@ void * receiveMessage(void * arg)
          * 3. send message to everyone who are online
          * etc;
          */
+
+        Log(db, receivedMessage);
+
         switch (receivedMessage->command)
         {
         case 0:
@@ -430,8 +446,6 @@ void * receiveMessage(void * arg)
                 currentOnlineList((char *)sendOnlineUsers->message);
 
                 send(clientFD, sendOnlineUsers, sizeof(struct sendMessageToClient), 0);
-
-                //////////////////////
             }
         }
 
