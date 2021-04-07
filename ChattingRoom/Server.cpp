@@ -236,6 +236,26 @@ int Login(sqlite3* db, char username[32], char password[256])
     return -1;
 }
 
+void currentOnlineList(char *list)
+{
+    struct onlineUser *currentOnline;
+    currentOnline = (struct onlineUser *)malloc(sizeof(struct onlineUser));
+    currentOnline = head->next;
+    while(currentOnline != NULL)
+    {
+        strcat(list, currentOnline->username);
+        if(currentOnline->next == NULL)
+        {
+            strcat(list, "\n");
+        }
+        else
+        {
+            strcat(list, ",");
+        }
+        currentOnline = currentOnline->next;
+    }
+}
+
 void * receiveMessage(void * arg)
 {
     printf("Server start receiving message!\n");
@@ -407,17 +427,11 @@ void * receiveMessage(void * arg)
                 sendOnlineUsers = (struct sendMessageToClient *)malloc(sizeof(struct sendMessageToClient));
                 sendOnlineUsers->command = 4;
                 sendOnlineUsers->result = 0;
+                currentOnlineList((char *)sendOnlineUsers->message);
 
-                struct onlineUser *currentOnline;
-                currentOnline = (struct onlineUser *)malloc(sizeof(struct onlineUser));
-                currentOnline = head->next;
-                while(currentOnline != NULL)
-                {
-                    memset(sendOnlineUsers->message, 0, sizeof(sendOnlineUsers->message));
-                    strcpy(sendOnlineUsers->message, currentOnline->username);
-                    send(clientFD, sendOnlineUsers, sizeof(struct sendMessageToClient), 0);
-                    currentOnline = currentOnline->next;
-                }
+                send(clientFD, sendOnlineUsers, sizeof(struct sendMessageToClient), 0);
+
+                //////////////////////
             }
         }
 
@@ -442,7 +456,7 @@ int main(int argc, char* argv[])
 
     pthread_t id;
 
-    sqlite3* db = OpenDatabase("./UserDB.db");
+    sqlite3* db = OpenDatabase((char*)"./UserDB.db");
     
     socketFD = socket(AF_INET, SOCK_STREAM, 0);
     if(socketFD == -1)
@@ -505,7 +519,5 @@ int main(int argc, char* argv[])
         usleep(3);
         
     }
-
-    
     return 0;
 }

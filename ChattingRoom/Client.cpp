@@ -116,21 +116,21 @@ void * receiveMessage(void* arg)
             switch (receivedMessage->command)
             {
             case 0:
-                printf("Regist success! Please login.\n");
+                printf("\nRegist success! Please login.\n");
                 break;
             case 1:
-                printf("Login success!\n");
+                printf("\nLogin success!\n");
                 isLogin = true;
                 break;
             case 2:
-                printf("%s send you a message:%s\n", receivedMessage->receiveFromName, receivedMessage->message);
+                printf("\n%s send you a message:%s\n", receivedMessage->receiveFromName, receivedMessage->message);
                 break;
             case 3:
-                printf("%s broadcast a message:%s\n", receivedMessage->receiveFromName, receivedMessage->message);
+                printf("\n%s broadcast a message:%s\n", receivedMessage->receiveFromName, receivedMessage->message);
                 break;
             case 4:
                 {
-                    printf("current online: %s", receivedMessage->message);
+                    printf("\ncurrent online: %s", receivedMessage->message);
                     break;
                 }
             }
@@ -140,20 +140,20 @@ void * receiveMessage(void* arg)
             switch (receivedMessage->command)
             {
             case 0:
-                printf("Regist failed\n");
+                printf("\nRegist failed\n");
                 printf("%s", receivedMessage->message);
                 break;
             
             case 1:
-                printf("Login falied\n");
+                printf("\nLogin falied\n");
                 isLogin = false;
                 memset(loggedinUsername,0,sizeof(loggedinUsername));
                 break;
             case 2:
-                printf("Send private message failed!\n");
+                printf("\nSend private message failed!\n");
                 break;
             case 3:
-                printf("Send broadcast message failed!\n");
+                printf("\nSend broadcast message failed!\n");
                 break;
             }
         }
@@ -306,7 +306,7 @@ int main(int argc, char* argv[])
                 char personUsername[32];
                 char privateMessage[512];
 
-                usleep(100);
+                usleep(300);
                 printf("Please input username you want to send message to:");
                 scanf("%s", personUsername);
                 printf("Please input message:");
@@ -329,12 +329,9 @@ int main(int argc, char* argv[])
             {
                 RequestOnlineUsers(&serverFD);
 
-                struct sendMessageToServer *requestOnlineUser;
-                requestOnlineUser = (struct sendMessageToServer *)malloc(sizeof(struct sendMessageToServer));
-                requestOnlineUser->command = 4;
-                send(serverFD, requestOnlineUser, sizeof(struct sendMessageToServer), 0);
-
                 char broadcastMessage[512];
+
+                usleep(300);
 
                 printf("Please input broadcast message:");
                 scanf("%s", broadcastMessage);
