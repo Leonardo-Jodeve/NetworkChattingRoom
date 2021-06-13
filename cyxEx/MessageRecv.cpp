@@ -35,24 +35,30 @@ int main(int argc, char* argv[])
 
     printf("Open queue %d success!\n", qid);
 
-    while (1)
+    do
     {
-        printf("Input some message:");
-        scanf("%s", msg.msg_text);
+        memset(msg.msg_text, 0, sizeof(msg.msg_text));
 
-        msg.msg_type = getpid();
-
-        if((msgsnd(qid, &msg, strlen(msg.msg_text), 0)) < 0)
+        if((msgrcv(qid, &msg, sizeof(msg.msg_text), 0, 0)) < 0)
         {
             perror("Message send error!\n");
             exit(1);
         }
 
+        printf("The message from %ld is %s\n", msg.msg_type, msg.msg_text);
+
         if(strncmp(msg.msg_text, "quit", 4) == 0)
         {
             break;
         }
+    }while(strncmp(msg.msg_text, "quit", 4) != 0);
+
+    if((msgctl(qid, IPC_RMID, NULL)) < 0)
+    {
+        perror("msgctl error!\n");
+        exit(1);
     }
+
     exit(0);
 
     return 0;

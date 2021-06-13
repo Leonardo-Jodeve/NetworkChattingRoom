@@ -1,3 +1,9 @@
+msgsend : MessageSend.cpp msgrecv
+	gcc MessageSend.cpp -o msgsend
+
+msgrecv : MessageRecv.cpp
+	gcc MessageRecv.cpp -o msgrecv
+
 semex : SemOP.cpp signalEx.cpp copylast10k
 	gcc SemOP.cpp signalEx.cpp -o semex
 
@@ -17,5 +23,5 @@ pipewrite : NamedPipeWrite.cpp
 	gcc NamedPipeWrite.cpp -o pipewrite
 
 clean : 
-	rm -rf pipe fifo piperead pipewrite fatherandchild dest.txt copylast10k semex
+	rm -rf pipe fifo piperead pipewrite fatherandchild dest.txt copylast10k semex msgrecv msgsend
 	clear
