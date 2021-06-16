@@ -1,11 +1,20 @@
+guardthread : GuardThread.cpp
+	gcc GuardThread.cpp -o guardthread
+
+threadsignal : ThreadSignal.cpp SemOP.cpp waitpid
+	gcc ThreadSignal.cpp SemOP.cpp -o threadsignal
+
+waitpid : WaitPID.cpp msgsend
+	gcc WaitPID.cpp -o waitpid
+
 msgsend : MessageSend.cpp msgrecv
 	gcc MessageSend.cpp -o msgsend
 
-msgrecv : MessageRecv.cpp
+msgrecv : MessageRecv.cpp semex
 	gcc MessageRecv.cpp -o msgrecv
 
-semex : SemOP.cpp signalEx.cpp copylast10k
-	gcc SemOP.cpp signalEx.cpp -o semex
+semex : SemOP.cpp SemEx.cpp copylast10k
+	gcc SemOP.cpp SemEx.cpp -o semex
 
 copylast10k : CopyLast10K.cpp fatherandchild
 	gcc CopyLast10K.cpp -o copylast10k
@@ -23,5 +32,5 @@ pipewrite : NamedPipeWrite.cpp
 	gcc NamedPipeWrite.cpp -o pipewrite
 
 clean : 
-	rm -rf pipe fifo piperead pipewrite fatherandchild dest.txt copylast10k semex msgrecv msgsend
+	rm -rf pipe fifo piperead pipewrite fatherandchild dest.txt copylast10k semex msgrecv msgsend waitpid threadsignal guardthread
 	clear
